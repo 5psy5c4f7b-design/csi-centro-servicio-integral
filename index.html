@@ -568,121 +568,20 @@ async function saveDetail(){
 }
 
 async function deleteCSIRepair(id){
-  const x=repairs.find(a=>Number(a.id)===Number(id));
-  if(!x)return;
-  const canDelete=currentProfile?.rol==='admin' || (currentProfile?.rol==='tecnico' && x.tecnico_id===currentUser?.id);
-  if(!canDelete){
-    alert('No tienes permiso para eliminar este expediente.');
+  if(!currentUser){
+    alert('Debes iniciar sesión.');
     return;
   }
-  const ok=confirm(`¿Eliminar definitivamente el expediente ${x.folio}?\n\nSe eliminarán también las fotos asociadas.\nEsta acción no se puede deshacer.`);
-  if(!ok)return;
 
-  try{
-    // Get photo paths first so the Storage files can also be removed.
-    const {data:photos,error:photoReadError}=await supabaseClient
-      .from('csi_fotos')
-      .select('id,ruta')
-      .eq('reparacion_id',id);
-    if(photoReadError) throw photoReadError;
-
-    const paths=(photos||[]).map(p=>p.ruta).filter(Boolean);
-    if(paths.length){
-      const {error:storageError}=await supabaseClient.storage.from('csi-fotos').remove(paths);
-      if(storageError) throw storageError;
-    }
-
-    const {error}=await supabaseClient.from('csi_reparaciones').delete().eq('id',id);
-    if(error) throw error;
-
-    repairs=repairs.filter(a=>Number(a.id)!==Number(id));
-    closeDetail();
-    renderAll();
-    alert(`Expediente ${x.folio} eliminado correctamente.`);
-  }catch(e){
-    console.error(e);
-    alert('No se pudo eliminar el expediente: '+(e.message||e));
+  if(!id || Number.isNaN(Number(id))){
+    alert('No se encontró el expediente.');
+    return;
   }
-}
 
-function printReport(){
-  const id=Number(document.getElementById('detailId').value),x=repairs.find(a=>a.id===id);if(!x)return;
-  const tests=Object.entries(x.tests||{}).map(([k,v])=>(v?'✓ ':'☐ ')+k).join(' | ');
-  const fotos=x.fotos||{};const fotoCount=['recepcion','antes','diagnostico','durante','despues'].reduce((n,k)=>n+(fotos[k]||[]).length,0);
-  const w=window.open('','_blank','width=800,height=900');if(!w){alert('Permite ventanas emergentes para imprimir.');return}
-  w.document.write(`<html><head><title>${x.folio}</title><style>body{font-family:Arial;padding:30px;max-width:760px;margin:auto}h1,h2{margin-bottom:5px}.box{border:1px solid #ddd;padding:12px;margin:10px 0}.row{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding:6px}.small{color:#666;font-size:12px}</style></head><body><h1>🔧 CSI — Centro de Servicio Integral</h1><div class="small">Expediente técnico ${esc(x.folio)}</div><div class="box"><div class="row"><b>Cliente</b><span>${esc(x.cliente)}</span></div><div class="row"><b>Equipo</b><span>${esc(x.marca)} ${esc(x.modelo)}</span></div><div class="row"><b>IMEI/Serie</b><span>${esc(x.imei)}</span></div><div class="row"><b>Técnico</b><span>${esc(x.tecnico)}</span></div><div class="row"><b>Estado</b><span>${esc(x.estado)}</span></div></div><h2>Falla reportada</h2><div class="box">${esc(x.falla)}</div><h2>Diagnóstico</h2><div class="box">${esc(x.diagnostico)}</div><h2>Mediciones</h2><div class="box">${esc(x.mediciones)}</div><h2>Trabajo realizado</h2><div class="box">${esc(x.trabajo)}</div><h2>Componentes / refacciones</h2><div class="box">${esc(x.componentes)}</div><h2>Pruebas finales</h2><div class="box">${esc(tests)}</div><h2>Evidencia fotográfica</h2><div class="box">Fotos documentadas: ${fotoCount}</div><h2>Finanzas</h2><div class="box">Presupuesto: ${money(x.presupuesto)}<br>Anticipo: ${money(x.anticipo)}<br>Saldo: ${money(x.saldo)}</div><p class="small">Generado por CSI — Centro de Servicio Integral</p><script>window.onload=()=>window.print()<\\/script></body></html>`);w.document.close();
-}
-
-/* ===== AUTH ===== */
-async function loginCSI(){
-  const raw=document.getElementById('loginUser').value.trim(), password=document.getElementById('loginPass').value;
-  const err=document.getElementById('loginError');err.style.display='none';
-  if(!raw||!password){err.textContent='Escribe usuario y contraseña.';err.style.display='block';return}
-  let email=raw;
-  if(!raw.includes('@')){
-    const {data,error}=await supabaseClient.rpc('csi_email_por_usuario',{p_usuario:raw});
-    if(error||!data){err.textContent='Usuario no encontrado.';err.style.display='block';return}
-    email=data;
-  }
-  const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
-  if(error){err.textContent=error.message;err.style.display='block';return}
-  await startCSI(data.user);
-}
-async function signupCSI(){
-  const name=v('signupName'),username=v('signupUsername').toLowerCase(),email=v('signupEmail').toLowerCase(),password=document.getElementById('signupPassword').value;
-  const err=document.getElementById('signupError');err.style.display='none';
-  if(!name||!username||!email||password.length<6){err.textContent='Completa los datos. La contraseña debe tener mínimo 6 caracteres.';err.style.display='block';return}
-  const {data:exists}=await supabaseClient.from('csi_tecnicos').select('id').eq('usuario',username).maybeSingle();
-  if(exists){err.textContent='Ese usuario ya existe.';err.style.display='block';return}
-  const {data,error}=await supabaseClient.auth.signUp({email,password,options:{data:{nombre:name,usuario:username}}});
-  if(error){err.textContent=error.message;err.style.display='block';return}
-  if(data.user){
-    alert('Cuenta creada. Si Supabase pide confirmar el correo, confírmalo y después inicia sesión.');
-    toggleSignup();
-  }
-}
-function toggleSignup(){
-  document.getElementById('loginForm').classList.toggle('hidden');
-  document.getElementById('signupForm').classList.toggle('hidden');
-}
-async function startCSI(user){
-  currentUser=user;
-  try{currentProfile=await getProfile(user)}catch(e){alert('No se encontró el perfil del técnico. Ejecuta el SQL de CSI primero.');return}
-  document.getElementById('loginScreen').style.display='none';
-  const header=document.querySelector('header');
-  let box=document.getElementById('csiSessionBox');
-  if(!box){box=document.createElement('div');box.id='csiSessionBox';box.style.cssText='display:flex;align-items:center;gap:10px;justify-content:flex-end;margin:8px 0 14px;flex-wrap:wrap';header.appendChild(box)}
-  box.innerHTML=`<span class="user-badge">👤 ${esc(currentProfile.nombre)} · ${esc(currentProfile.rol)}</span><button onclick="logoutCSI()" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;cursor:pointer">Cerrar sesión</button>`;
-  const tabUsers=document.getElementById('tabUsuarios');if(tabUsers)tabUsers.classList.toggle('hidden',currentProfile.rol!=='admin');
-  const us=document.getElementById('usuarios');if(us&&currentProfile.rol!=='admin')us.classList.add('hidden');
-  if(document.getElementById('dTecnico'))document.getElementById('dTecnico').value=currentProfile.nombre;
-  await loadRepairs();
-}
-async function logoutCSI(){await supabaseClient.auth.signOut();location.reload()}
-
-document.addEventListener('DOMContentLoaded',async()=>{
-  const {data}=await supabaseClient.auth.getSession();
-  if(data.session){await startCSI(data.session.user)}
-  supabaseClient.auth.onAuthStateChange((_event,session)=>{if(session&&!currentUser)startCSI(session.user)});
-});
-
-
-/* ===== ADMINISTRACIÓN DE PERFILES ===== */
-async function renderCSIUsers(){
-  const box=document.getElementById('usersList');if(!box||currentProfile?.rol!=='admin')return;
-  const {data,error}=await supabaseClient.from('csi_tecnicos').select('*').order('nombre');
-  if(error){box.innerHTML='<p class="muted">No se pudieron cargar los usuarios.</p>';return}
-  box.innerHTML='<div class="users-grid">'+(data||[]).map(u=>`<div class="user-card"><strong>👤 ${esc(u.nombre)}</strong><div style="color:#667085;margin-top:5px">@${esc(u.usuario)}</div><div style="margin-top:8px"><span class="user-badge">${esc(u.rol)}</span></div></div>`).join('')+'</div>';
-}
-
-
-async function deleteCSIRepair(id){
-  const session = getCSISession();
-  if(!session) return alert('Debes iniciar sesión.');
   if(!confirm('¿Seguro que quieres eliminar este expediente? Esta acción no se puede deshacer.')) return;
 
   try{
-    // Get photo paths first, then remove database records and storage objects.
+    // Obtener primero las rutas de las fotos para eliminarlas también del Storage.
     const {data:photos,error:photoErr}=await supabaseClient
       .from('csi_fotos')
       .select('id,ruta')
@@ -691,28 +590,48 @@ async function deleteCSIRepair(id){
     if(photoErr) throw photoErr;
 
     const paths=(photos||[]).map(p=>p.ruta).filter(Boolean);
+
+    // Eliminar archivos físicos del bucket privado.
     if(paths.length){
-      const {error:storageErr}=await supabaseClient.storage.from('csi-fotos').remove(paths);
+      const {error:storageErr}=await supabaseClient
+        .storage.from('csi-fotos')
+        .remove(paths);
       if(storageErr) throw storageErr;
     }
 
+    // Eliminar el expediente. La relación de fotos tiene ON DELETE CASCADE,
+    // pero también intentamos limpiar explícitamente las filas de fotos.
     const {error:dbPhotoErr}=await supabaseClient
       .from('csi_fotos')
       .delete()
       .eq('reparacion_id',id);
+
     if(dbPhotoErr) throw dbPhotoErr;
 
-    const {error:repairErr}=await supabaseClient
+    const {data:deleted,error:repairErr}=await supabaseClient
       .from('csi_reparaciones')
       .delete()
-      .eq('id',id);
+      .eq('id',id)
+      .select('id')
+      .maybeSingle();
+
     if(repairErr) throw repairErr;
 
+    if(!deleted){
+      throw new Error('Supabase no eliminó el expediente. Revisa las políticas RLS de DELETE.');
+    }
+
+    closeDetail();
     alert('Expediente y fotografías eliminados correctamente.');
-    if(typeof loadRepairs==='function') await loadRepairs();
-    if(typeof renderAll==='function') await renderAll();
+
+    if(typeof loadRepairs==='function'){
+      await loadRepairs();
+    }
+    if(typeof renderAll==='function'){
+      await renderAll();
+    }
   }catch(e){
-    console.error(e);
+    console.error('Error al eliminar expediente:',e);
     alert('No se pudo eliminar el expediente: '+(e.message||e));
   }
 }
