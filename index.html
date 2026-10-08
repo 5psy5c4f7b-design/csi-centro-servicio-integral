@@ -568,70 +568,55 @@ async function saveDetail(){
 }
 
 async function deleteCSIRepair(id){
-  if(!currentUser){
-    alert('Debes iniciar sesión.');
+  if(!currentUser || !currentProfile){
+    alert('La sesión no está activa. Vuelve a iniciar sesión.');
     return;
   }
 
-  if(!id || Number.isNaN(Number(id))){
+  const repair=repairs.find(x=>Number(x.id)===Number(id));
+  if(!repair){
     alert('No se encontró el expediente.');
     return;
   }
 
-  if(!confirm('¿Seguro que quieres eliminar este expediente? Esta acción no se puede deshacer.')) return;
+  const allowed = currentProfile.rol==='admin' || String(repair.tecnico_id)===String(currentUser.id);
+  if(!allowed){
+    alert('No tienes permiso para eliminar este expediente.');
+    return;
+  }
+
+  if(!confirm('¿Seguro que quieres eliminar este expediente? También se eliminarán sus fotografías. Esta acción no se puede deshacer.')) return;
 
   try{
-    // Obtener primero las rutas de las fotos para eliminarlas también del Storage.
     const {data:photos,error:photoErr}=await supabaseClient
       .from('csi_fotos')
       .select('id,ruta')
       .eq('reparacion_id',id);
-
     if(photoErr) throw photoErr;
 
     const paths=(photos||[]).map(p=>p.ruta).filter(Boolean);
-
-    // Eliminar archivos físicos del bucket privado.
     if(paths.length){
-      const {error:storageErr}=await supabaseClient
-        .storage.from('csi-fotos')
-        .remove(paths);
-      if(storageErr) throw storageErr;
+      const {error:storageErr}=await supabaseClient.storage.from('csi-fotos').remove(paths);
+      if(storageErr) console.warn('No se pudieron borrar algunas fotos del Storage:',storageErr);
     }
 
-    // Eliminar el expediente. La relación de fotos tiene ON DELETE CASCADE,
-    // pero también intentamos limpiar explícitamente las filas de fotos.
     const {error:dbPhotoErr}=await supabaseClient
       .from('csi_fotos')
       .delete()
       .eq('reparacion_id',id);
-
     if(dbPhotoErr) throw dbPhotoErr;
 
-    const {data:deleted,error:repairErr}=await supabaseClient
+    const {error:repairErr}=await supabaseClient
       .from('csi_reparaciones')
       .delete()
-      .eq('id',id)
-      .select('id')
-      .maybeSingle();
-
+      .eq('id',id);
     if(repairErr) throw repairErr;
 
-    if(!deleted){
-      throw new Error('Supabase no eliminó el expediente. Revisa las políticas RLS de DELETE.');
-    }
-
     closeDetail();
-    alert('Expediente y fotografías eliminados correctamente.');
-
-    if(typeof loadRepairs==='function'){
-      await loadRepairs();
-    }
-    if(typeof renderAll==='function'){
-      await renderAll();
-    }
+    await loadRepairs();
+    alert('Expediente eliminado correctamente.');
   }catch(e){
-    console.error('Error al eliminar expediente:',e);
+    console.error(e);
     alert('No se pudo eliminar el expediente: '+(e.message||e));
   }
 }
