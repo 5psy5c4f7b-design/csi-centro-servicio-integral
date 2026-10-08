@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CSI — Centro de Servicio Integral</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f3f5f7;color:#17202a}
+header{background:#111827;color:#fff;padding:18px 24px;display:flex;justify-content:space-between;align-items:center}
+header h1{margin:0;font-size:21px}main{max-width:1400px;margin:22px auto;padding:0 16px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 2px 10px #0000000d}
+.stat{font-size:27px;font-weight:800;margin-top:6px}.muted{color:#6b7280;font-size:13px}
+.tabs{display:flex;gap:8px;margin:18px 0;flex-wrap:wrap}.tabs button.active{background:#111827;color:#fff}
+button{border:0;border-radius:9px;padding:10px 13px;cursor:pointer;font-weight:700}.primary{background:#2563eb;color:#fff}.success{background:#16a34a;color:#fff}.warning{background:#f59e0b;color:#111}.danger{background:#dc2626;color:#fff}.secondary{background:#e5e7eb;color:#111827}
+.formgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}label{font-size:13px;font-weight:700;display:block;margin-bottom:5px}
+input,select,textarea{width:100%;padding:11px;border:1px solid #d1d5db;border-radius:8px;font-size:14px}textarea{min-height:90px}
+table{width:100%;border-collapse:collapse;margin-top:15px;background:#fff}th,td{padding:9px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:12px;vertical-align:top}th{background:#f9fafb;white-space:nowrap}
+.search{margin-top:15px;max-width:550px}.hidden{display:none!important}.msg{padding:10px;border-radius:8px;margin:10px 0;background:#fee2e2;color:#991b1b}.ok{background:#dcfce7;color:#166534}
+.actions{display:flex;gap:5px;flex-wrap:wrap}.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800}.rec{background:#dbeafe;color:#1e40af}.diag{background:#ede9fe;color:#6d28d9}.auth{background:#fef3c7;color:#92400e}.wait{background:#ffedd5;color:#9a3412}.repair{background:#cffafe;color:#155e75}.done{background:#dcfce7;color:#166534}.deliv{background:#e0e7ff;color:#3730a3}.closed{background:#e5e7eb;color:#374151}
+.modal{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}.modalbox{background:#fff;border-radius:14px;padding:20px;max-width:1000px;width:100%;max-height:92vh;overflow:auto}
+.modalgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.checkgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.check{border:1px solid #ddd;border-radius:8px;padding:8px;font-size:13px}
+.photoGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}
+.photoBox{border:1px dashed #bbb;border-radius:10px;padding:10px;background:#fafafa}
+.photoBox img{width:100%;height:140px;object-fit:cover;border-radius:8px;margin-top:7px}
+.photoActions{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.photoEmpty{height:140px;display:flex;align-items:center;justify-content:center;color:#888;font-size:12px}
+
+@media(max-width:1000px){.grid{grid-template-columns:repeat(2,1fr)}.formgrid,.modalgrid{grid-template-columns:1fr 1fr}.checkgrid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.grid,.formgrid,.modalgrid,.checkgrid{grid-template-columns:1fr}table{display:block;overflow-x:auto}}
+
+/* ===== CSI LOGIN / USUARIOS ===== */
+#loginScreen{
+  position:fixed; inset:0; z-index:99999; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg,#0b1220,#111827); padding:20px;
+}
+.login-card{
+  width:min(420px,100%); background:#fff; border-radius:22px; padding:30px;
+  box-shadow:0 25px 80px rgba(0,0,0,.35);
+}
+.login-logo{font-size:34px;font-weight:800;text-align:center;margin-bottom:6px}
+.login-sub{text-align:center;color:#667085;margin-bottom:24px}
+.login-card label{display:block;font-weight:700;margin:14px 0 7px}
+.login-card input,.login-card select{
+  width:100%;box-sizing:border-box;padding:13px 14px;border:1px solid #d0d5dd;border-radius:10px;font-size:16px;
+}
+.login-card button{width:100%;margin-top:20px;padding:13px;border:0;border-radius:10px;background:#111827;color:#fff;font-weight:800;cursor:pointer}
+.login-error{color:#b42318;background:#fef3f2;border-radius:9px;padding:10px;margin-top:12px;display:none}
+.user-badge{display:inline-flex;align-items:center;gap:7px;background:#eef2ff;padding:7px 11px;border-radius:999px;font-weight:700}
+#usersPanel{margin-top:20px}
+.users-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.user-card{border:1px solid #e4e7ec;border-radius:14px;padding:16px;background:#fff}
+.user-card strong{font-size:17px}
+.user-actions{display:flex;gap:8px;margin-top:12px}
+.user-actions button{flex:1}
+.hidden{display:none!important}
+
+
+/* ===== CSI DIAGNOSTICO POR PASOS ===== */
+.stepbar{display:flex;gap:7px;flex-wrap:wrap;margin:15px 0 20px}
+.stepbtn{background:#eef2f7;color:#344054;border:1px solid #d0d5dd;padding:9px 11px;border-radius:10px;font-size:12px}
+.stepbtn.active{background:#111827;color:#fff;border-color:#111827}
+.stepbtn.done{background:#dcfce7;color:#166534;border-color:#86efac}
+.detailStep{display:none}
+.detailStep.active{display:block}
+.step-title{margin:0 0 5px;font-size:20px}
+.step-sub{margin:0 0 18px;color:#667085;font-size:13px}
+.stepnav{display:flex;justify-content:space-between;gap:8px;margin-top:20px;padding-top:15px;border-top:1px solid #e5e7eb}
+.stepnav .right{display:flex;gap:8px}
+.sectionbox{background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:14px}
+
+
+/* ===== RESPONSIVE MOBILE ===== */
+*{box-sizing:border-box}
+html,body{max-width:100%;overflow-x:hidden}
+body{margin:0}
+img{max-width:100%;height:auto}
+button,input,select,textarea{font:inherit;max-width:100%}
+@media(max-width:700px){
+  body{font-size:14px}
+  header{padding:14px 12px!important}
+  header h1{font-size:22px!important;line-height:1.15}
+  header p{font-size:12px!important}
+  main,.container,.content{width:100%!important;max-width:100%!important;padding:10px!important;margin:0!important}
+  .tabs{display:grid!important;grid-template-columns:1fr 1fr;gap:7px!important}
+  .tabs button{width:100%!important;padding:10px 7px!important;font-size:12px!important}
+  .grid,.modalgrid,.photoGrid,.checkgrid,.stats,.cards,.users-grid{grid-template-columns:1fr!important}
+  .card{padding:13px!important;border-radius:13px!important}
+  .form-grid{grid-template-columns:1fr!important}
+  input,select,textarea{width:100%!important;min-height:44px!important}
+  textarea{min-height:100px!important}
+  .btn,.primary,.secondary,button{min-height:42px}
+  table{display:block!important;width:100%!important;overflow-x:auto!important;white-space:nowrap}
+  .table-wrap{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
+  .modal,.modal-content,.detail-modal{width:100%!important;max-width:100%!important}
+  .modal-content{margin:0!important;border-radius:14px 14px 0 0!important}
+  .stepbar{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:6px!important}
+  .stepbtn{width:100%!important;min-height:43px!important;font-size:11px!important;padding:7px 4px!important}
+  .stepnav{position:sticky;bottom:0;background:#fff;z-index:10;display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important;padding:10px 0!important}
+  .stepnav .right{display:grid!important;grid-template-columns:1fr!important;gap:7px!important}
+  .stepnav button{width:100%!important}
+  .photoBox{padding:10px!important}
+  .photoBox input[type=file]{font-size:12px!important}
+  .user-badge{font-size:11px}
+  #csiSessionBox{justify-content:center!important}
+  #csiSessionBox button{width:auto!important}
+  .login-card{padding:22px!important;border-radius:17px!important}
+  .login-logo{font-size:29px!important}
+}
+@media(min-width:701px){
+  .table-wrap{overflow-x:auto}
+}
+
+
+@media(max-width:700px){
+  #repTable td:last-child{min-width:170px}
+  #repTable td:last-child button{display:block;width:100%;margin:4px 0}
+}
+
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">🔧 CSI</div>
+    <div class="login-sub">Centro de Servicio Integral</div>
+
+    <div id="loginForm">
+      <label>Usuario o correo</label>
+      <input id="loginUser" autocomplete="username" placeholder="Usuario o correo">
+      <label>Contraseña</label>
+      <input id="loginPass" type="password" autocomplete="current-password" placeholder="Contraseña">
+      <button onclick="loginCSI()">INICIAR SESIÓN</button>
+      <button type="button" class="secondary" onclick="toggleSignup()" style="margin-top:8px">Crear cuenta de técnico</button>
+      <div id="loginError" class="login-error"></div>
+    </div>
+
+    <div id="signupForm" class="hidden">
+      <label>Nombre del técnico</label>
+      <input id="signupName" placeholder="Nombre completo">
+      <label>Usuario</label>
+      <input id="signupUsername" placeholder="Ej. juan">
+      <label>Correo</label>
+      <input id="signupEmail" type="email" placeholder="correo@ejemplo.com">
+      <label>Contraseña</label>
+      <input id="signupPassword" type="password" placeholder="Mínimo 6 caracteres">
+      <button onclick="signupCSI()">CREAR CUENTA</button>
+      <button type="button" class="secondary" onclick="toggleSignup()" style="margin-top:8px">Volver a iniciar sesión</button>
+      <div id="signupError" class="login-error"></div>
+    </div>
+
+    <div style="margin-top:14px;text-align:center;color:#667085;font-size:12px">
+      Los usuarios y expedientes se guardan en Supabase.
+    </div>
+  </div>
+</div>
+
+
+<header><h1>🔧 CSI — Centro de Servicio Integral</h1><span>Gestión técnica de reparaciones</span></header>
+
+<main>
+<div class="grid">
+<div class="card"><div class="muted">Reparaciones abiertas</div><div id="statOpen" class="stat">0</div></div>
+<div class="card"><div class="muted">En diagnóstico</div><div id="statDiag" class="stat">0</div></div>
+<div class="card"><div class="muted">En reparación</div><div id="statRepair" class="stat">0</div></div>
+<div class="card"><div class="muted">Terminadas</div><div id="statDone" class="stat">0</div></div>
+</div>
+
+<div class="tabs">
+<button onclick="showTab('usuarios')" id="tabUsuarios">👥 Técnicos</button>
+<button id="tabRep" class="active" onclick="showTab('rep')">🔧 Reparaciones</button>
+<button id="tabCases" onclick="showTab('cases')">📚 Casos técnicos</button>
+</div>
+
+<section id="repSection">
+<div class="card">
+<h2>📥 Nueva recepción</h2>
+<p class="muted">Cada equipo recibe un folio automático y tendrá un expediente técnico.</p>
+<div id="formMsg" class="msg hidden"></div>
+<div class="formgrid">
+<div><label>Cliente *</label><input id="cliente"></div>
+<div><label>Teléfono / WhatsApp</label><input id="telefono"></div>
+<div><label>Marca *</label><input id="marca"></div>
+<div><label>Modelo *</label><input id="modelo"></div>
+<div><label>IMEI / Serie</label><input id="imei"></div>
+<div><label>Color</label><input id="color"></div>
+<div><label>Contraseña / PIN</label><input id="pin"></div>
+<div><label>Técnico responsable *</label><input id="tecnico"></div>
+<div><label>Estado físico</label><input id="estado_fisico" placeholder="Golpes, pantalla, humedad, etc."></div>
+<div><label>Accesorios recibidos</label><input id="accesorios" placeholder="Cargador, SIM, funda..."></div>
+<div><label>Presupuesto inicial</label><input id="presupuesto" type="number" step="0.01"></div>
+<div><label>Prioridad</label><select id="prioridad"><option>Normal</option><option>Urgente</option></select></div>
+<div style="grid-column:1/-1"><label>Falla reportada por el cliente *</label><textarea id="falla" placeholder="Describe exactamente qué reporta el cliente..."></textarea></div>
+<div style="grid-column:1/-1">
+<label>📸 Fotos de recepción</label>
+<p class="muted">Puedes agregar fotos del frente, atrás, daños, IMEI o cualquier evidencia del equipo.</p>
+<input id="recepcionFotos" type="file" accept="image/*" multiple onchange="previewFiles('recepcionFotos','recepcionPreview')">
+<div id="recepcionPreview" class="photoGrid"></div>
+</div>
+</div><br>
+<button class="primary" onclick="addRepair()">📥 Crear expediente</button>
+</div>
+
+<input class="search" id="search" oninput="renderRepairs()" placeholder="🔎 Buscar folio, cliente, IMEI, marca, modelo o falla">
+
+<div class="card"><h2>📋 Expedientes</h2><div id="repTable"></div></div>
+</section>
+
+<section id="casesSection" class="hidden">
+<div class="card">
+<h2>📚 Casos técnicos</h2>
+<p class="muted">Aquí podrás consultar diagnósticos y soluciones de reparaciones anteriores.</p>
+<div id="casesTable"></div>
+</div>
+</section>
+
+
+<section id="usuarios" class="hidden">
+  <div class="card">
+    <h2>👥 Técnicos</h2>
+    <p>Los técnicos crean su cuenta desde el inicio de sesión. El administrador puede consultar sus perfiles aquí.</p>
+    <div id="usersList" style="margin-top:20px"></div>
+  </div>
+</section>
+
+
+</main>
+
+<div id="detailModal" class="modal hidden">
+<div class="modalbox">
+<h2>📋 Expediente técnico <span id="dFolio"></span></h2>
+<div id="detailMsg" class="msg hidden"></div>
+
+<input type="hidden" id="detailId">
+
+<div class="stepbar">
+  <button type="button" class="stepbtn active" id="stepBtn1" onclick="showDetailStep(1)">1. 📱 Recepción</button>
+  <button type="button" class="stepbtn" id="stepBtn2" onclick="showDetailStep(2)">2. 🔍 Diagnóstico</button>
+  <button type="button" class="stepbtn" id="stepBtn3" onclick="showDetailStep(3)">3. 📸 Evidencia</button>
+  <button type="button" class="stepbtn" id="stepBtn4" onclick="showDetailStep(4)">4. 🔧 Reparación</button>
+  <button type="button" class="stepbtn" id="stepBtn5" onclick="showDetailStep(5)">5. 🧪 Pruebas</button>
+  <button type="button" class="stepbtn" id="stepBtn6" onclick="showDetailStep(6)">6. 💰 Cierre</button>
+</div>
+
+<div id="detailStep1" class="detailStep active">
+  <h3 class="step-title">📱 Paso 1 — Recepción del equipo</h3>
+  <p class="step-sub">Aquí se registra el cliente y las características del equipo.</p>
+  <div class="sectionbox">
+    <div class="modalgrid">
+      <div><label>Cliente</label><input id="dCliente"></div>
+      <div><label>Teléfono</label><input id="dTelefono"></div>
+      <div><label>Técnico</label><input id="dTecnico"></div>
+      <div><label>Marca</label><input id="dMarca"></div>
+      <div><label>Modelo</label><input id="dModelo"></div>
+      <div><label>IMEI / Serie</label><input id="dImei"></div>
+      <div><label>Color</label><input id="dColor"></div>
+      <div><label>PIN</label><input id="dPin"></div>
+      <div><label>Estado</label><select id="dEstado">
+        <option>Recibido</option><option>En diagnóstico</option><option>Esperando autorización</option>
+        <option>Esperando refacción</option><option>En reparación</option><option>Reparado</option>
+        <option>Pendiente de pago</option><option>Entregado</option><option>No reparado</option>
+      </select></div>
+    </div>
+    <br>
+    <label>Falla reportada por el cliente</label>
+    <textarea id="dFalla" placeholder="¿Qué problema reporta el cliente?"></textarea>
+  </div>
+  <div class="stepnav">
+    <span></span><button class="primary" type="button" onclick="showDetailStep(2)">Siguiente → Diagnóstico</button>
+  </div>
+</div>
+
+<div id="detailStep2" class="detailStep">
+  <h3 class="step-title">🔍 Paso 2 — Diagnóstico técnico</h3>
+  <p class="step-sub">Registra qué encontraste antes de comenzar la reparación.</p>
+  <div class="sectionbox">
+    <label>Diagnóstico técnico</label>
+    <textarea id="dDiagnostico" placeholder="Síntoma, diagnóstico, causa probable..."></textarea>
+    <br>
+    <label>Mediciones / voltajes / líneas</label>
+    <textarea id="dMediciones" placeholder="Ej. VPH 3.7V, PP_VDD_MAIN 0.120Ω, VSN -5.1V..."></textarea>
+    <br>
+    <label>Pruebas realizadas</label>
+    <textarea id="dPruebas" placeholder="Pruebas realizadas para confirmar la falla..."></textarea>
+    <br>
+    <label>Observaciones técnicas</label>
+    <textarea id="dObservaciones" placeholder="Hallazgos, corto, componente sospechoso, etc."></textarea>
+  </div>
+  <div class="stepnav">
+    <button class="secondary" type="button" onclick="showDetailStep(1)">← Anterior</button>
+    <div class="right"><button class="primary" type="button" onclick="showDetailStep(3)">Siguiente → Evidencia</button></div>
+  </div>
+</div>
+
+<div id="detailStep3" class="detailStep">
+  <h3 class="step-title">📸 Paso 3 — Evidencia fotográfica</h3>
+  <p class="step-sub">Guarda las fotos correspondientes a cada etapa de la reparación.</p>
+  <div class="photoGrid">
+    <div class="photoBox"><b>Antes</b><input id="fAntes" type="file" accept="image/*" multiple onchange="previewFiles('fAntes','pAntes')"><div id="pAntes"></div></div>
+    <div class="photoBox"><b>Diagnóstico</b><input id="fDiagnostico" type="file" accept="image/*" multiple onchange="previewFiles('fDiagnostico','pDiagnostico')"><div id="pDiagnostico"></div></div>
+    <div class="photoBox"><b>Durante</b><input id="fDurante" type="file" accept="image/*" multiple onchange="previewFiles('fDurante','pDurante')"><div id="pDurante"></div></div>
+    <div class="photoBox"><b>Después</b><input id="fDespues" type="file" accept="image/*" multiple onchange="previewFiles('fDespues','pDespues')"><div id="pDespues"></div></div>
+  </div>
+  <div class="stepnav">
+    <button class="secondary" type="button" onclick="showDetailStep(2)">← Anterior</button>
+    <div class="right"><button class="primary" type="button" onclick="showDetailStep(4)">Siguiente → Reparación</button></div>
+  </div>
+</div>
+
+<div id="detailStep4" class="detailStep">
+  <h3 class="step-title">🔧 Paso 4 — Reparación</h3>
+  <p class="step-sub">Documenta exactamente qué se hizo y qué piezas se utilizaron.</p>
+  <div class="sectionbox">
+    <label>Trabajo realizado</label>
+    <textarea id="dTrabajo" placeholder="Procedimiento realizado, reparación, cambio de componente, etc."></textarea>
+    <br>
+    <label>Componentes / IC / refacciones</label>
+    <textarea id="dComponentes" placeholder="IC, conector, pantalla, batería, componente, refacción, etc."></textarea>
+  </div>
+  <div class="stepnav">
+    <button class="secondary" type="button" onclick="showDetailStep(3)">← Anterior</button>
+    <div class="right"><button class="primary" type="button" onclick="showDetailStep(5)">Siguiente → Pruebas finales</button></div>
+  </div>
+</div>
+
+<div id="detailStep5" class="detailStep">
+  <h3 class="step-title">🧪 Paso 5 — Pruebas finales</h3>
+  <p class="step-sub">Marca cada función que fue probada antes de entregar el equipo.</p>
+  <div class="checkgrid">
+    <label class="check"><input type="checkbox" id="tEncendido"> Encendido</label>
+    <label class="check"><input type="checkbox" id="tCarga"> Carga</label>
+    <label class="check"><input type="checkbox" id="tPantalla"> Pantalla</label>
+    <label class="check"><input type="checkbox" id="tTouch"> Touch</label>
+    <label class="check"><input type="checkbox" id="tCamara"> Cámaras</label>
+    <label class="check"><input type="checkbox" id="tMicro"> Micrófono</label>
+    <label class="check"><input type="checkbox" id="tBocina"> Bocina</label>
+    <label class="check"><input type="checkbox" id="tWifi"> Wi-Fi</label>
+    <label class="check"><input type="checkbox" id="tBluetooth"> Bluetooth</label>
+    <label class="check"><input type="checkbox" id="tRed"> Red móvil</label>
+    <label class="check"><input type="checkbox" id="tSim"> SIM</label>
+    <label class="check"><input type="checkbox" id="tBiometria"> Huella / Face ID</label>
+    <label class="check"><input type="checkbox" id="tSensores"> Sensores</label>
+    <label class="check"><input type="checkbox" id="tBateria"> Batería</label>
+  </div>
+  <div class="stepnav">
+    <button class="secondary" type="button" onclick="showDetailStep(4)">← Anterior</button>
+    <div class="right"><button class="primary" type="button" onclick="showDetailStep(6)">Siguiente → Cierre</button></div>
+  </div>
+</div>
+
+<div id="detailStep6" class="detailStep">
+  <h3 class="step-title">💰 Paso 6 — Cierre del servicio</h3>
+  <p class="step-sub">Presupuesto, anticipo, saldo y estado final del equipo.</p>
+  <div class="sectionbox">
+    <div class="modalgrid">
+      <div><label>Presupuesto</label><input id="dPresupuesto" type="number" step="0.01"></div>
+      <div><label>Anticipo</label><input id="dAnticipo" type="number" step="0.01"></div>
+      <div><label>Saldo</label><input id="dSaldo" type="number" step="0.01" readonly></div>
+    </div>
+  </div>
+  <div class="stepnav">
+    <button class="secondary" type="button" onclick="showDetailStep(5)">← Anterior</button>
+    <div class="right">
+      <button class="primary" type="button" onclick="saveDetail()">💾 Guardar expediente</button>
+      <button class="secondary" type="button" onclick="printReport()">🧾 Imprimir reporte</button>
+      <button class="danger" type="button" onclick="deleteCSIRepair(Number(document.getElementById('detailId').value))">🗑️ Eliminar expediente</button>
+      <button class="secondary" type="button" onclick="closeDetail()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+</div></div>
+
+<script>
+
+/* ===== CSI CLOUD / SUPABASE ===== */
+const SUPABASE_URL='https://duxllgkedniirfxrrcxf.supabase.co';
+const SUPABASE_ANON_KEY='sb_publishable_KzWoAKs-CHvIvmr5MJs40w_33Vx0iM2';
+const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+let repairs=[];
+let currentUser=null;
+let currentProfile=null;
+
+const STATUS_LIST=['Recibido','En diagnóstico','Esperando autorización','Esperando refacción','En reparación','Reparado','Pendiente de pago','Entregado','No reparado'];
+
+function v(id){const e=document.getElementById(id);return e?e.value.trim():''}
+function n(id){return Number(document.getElementById(id)?.value||0)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function money(x){return Number(x||0).toLocaleString('es-MX',{style:'currency',currency:'MXN'})}
+function now(){return new Date().toISOString()}
+function statusClass(s){return s==='Recibido'?'rec':s==='En diagnóstico'?'diag':s==='Esperando autorización'?'auth':s==='Esperando refacción'?'wait':s==='En reparación'?'repair':s==='Reparado'?'done':s==='Entregado'?'deliv':'closed'}
+function showMsg(id,text,ok=false){const e=document.getElementById(id);if(!e)return;e.textContent=text;e.className='msg '+(ok?'ok':'');e.classList.remove('hidden')}
+function closeDetail(){document.getElementById('detailModal').classList.add('hidden')}
+
+async function getProfile(user){
+  const {data,error}=await supabaseClient.from('csi_tecnicos').select('*').eq('id',user.id).maybeSingle();
+  if(error) throw error;
+  return data;
+}
+async function loadRepairs(){
+  let q=supabaseClient.from('csi_reparaciones').select('*').order('created_at',{ascending:false});
+  if(currentProfile?.rol==='tecnico') q=q.eq('tecnico_id',currentUser.id);
+  const {data,error}=await q;
+  if(error){console.error(error);alert('No se pudieron cargar las reparaciones: '+error.message);return}
+  repairs=(data||[]).map(x=>({...x,fotos:x.fotos||{recepcion:[],antes:[],diagnostico:[],durante:[],despues:[]}}));
+  renderAll();
+}
+function newFolio(){
+  const year=new Date().getFullYear();
+  return 'REP-'+year+'-'+String(Date.now()).slice(-6);
+}
+
+async function readFiles(inputId){
+  const input=document.getElementById(inputId);
+  const files=[...(input?.files||[])];
+  return files;
+}
+function previewFiles(inputId,previewId){
+  const input=document.getElementById(inputId),box=document.getElementById(previewId);if(!input||!box)return;
+  box.innerHTML='';
+  [...(input.files||[])].forEach(f=>{
+    const url=URL.createObjectURL(f);
+    const img=document.createElement('img');img.src=url;img.alt=f.name;box.appendChild(img);
+  });
+}
+function renderSavedPhotos(targetId,photos,editable=false){
+  const box=document.getElementById(targetId);if(!box)return;
+  box.innerHTML='';
+  if(!photos?.length){box.innerHTML='<div class="photoEmpty">Sin fotos</div>';return}
+  photos.forEach((p,i)=>{
+    const wrap=document.createElement('div');wrap.style.marginBottom='8px';
+    const img=document.createElement('img');img.src=p.url||p;img.alt='Evidencia';wrap.appendChild(img);
+    if(editable){
+      const b=document.createElement('button');b.className='danger';b.textContent='Eliminar';b.style.marginTop='5px';
+      b.onclick=()=>deletePhoto(p.id||null,targetId,i);wrap.appendChild(b);
+    }
+    box.appendChild(wrap);
+  });
+}
+async function deletePhoto(photoId,targetId,index){
+  if(!confirm('¿Eliminar esta foto?'))return;
+  if(photoId){
+    await supabaseClient.from('csi_fotos').delete().eq('id',photoId);
+  }
+  const id=Number(document.getElementById('detailId').value);
+  const r=repairs.find(x=>x.id===id);
+  if(r?.fotos?.[targetId]) r.fotos[targetId].splice(index,1);
+  renderSavedPhotos(targetId,r?.fotos?.[targetId]||[],true);
+}
+
+async function uploadPhotos(repairId,stage,inputId){
+  const files=await readFiles(inputId);
+  const saved=[];
+  for(const file of files){
+    const ext=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'');
+    const path=`${repairId}/${stage}/${crypto.randomUUID()}.${ext}`;
+    const {error}=await supabaseClient.storage.from('csi-fotos').upload(path,file,{upsert:false,contentType:file.type});
+    if(error) throw error;
+    const {data,rowError}=await supabaseClient.from('csi_fotos').insert({reparacion_id:repairId,etapa:stage,ruta:path,url:'',nombre_archivo:file.name}).select().single();
+    if(rowError) throw rowError;
+    saved.push(data);
+  }
+  return saved;
+}
+async function loadPhotos(repairId){
+  const {data,error}=await supabaseClient.from('csi_fotos').select('*').eq('reparacion_id',repairId).order('created_at');
+  if(error)return {recepcion:[],antes:[],diagnostico:[],durante:[],despues:[]};
+  const out={recepcion:[],antes:[],diagnostico:[],durante:[],despues:[]};
+  for(const p of (data||[])){
+    const signed=await supabaseClient.storage.from('csi-fotos').createSignedUrl(p.ruta,3600);
+    p.url=signed.data?.signedUrl||'';
+    (out[p.etapa]||out.antes).push(p);
+  }
+  return out;
+}
+
+async function addRepair(){
+  if(!v('cliente')||!v('marca')||!v('modelo')||!v('falla')){showMsg('formMsg','Cliente, marca, modelo y falla reportada son obligatorios.');return}
+  if(!currentUser)return alert('Inicia sesión.');
+  const tecnicoName=currentProfile?.nombre||v('tecnico')||currentUser.email;
+  const r={
+    folio:newFolio(),created_at:now(),cliente:v('cliente'),telefono:v('telefono'),
+    marca:v('marca'),modelo:v('modelo'),imei:v('imei'),color:v('color'),pin:v('pin'),
+    tecnico:tecnicoName,tecnico_id:currentUser.id,estado_fisico:v('estado_fisico'),
+    accesorios:v('accesorios'),presupuesto:n('presupuesto'),prioridad:v('prioridad'),
+    falla:v('falla'),estado:'Recibido',diagnostico:'',mediciones:'',pruebas:'',
+    trabajo:'',componentes:'',observaciones:'',anticipo:0,saldo:n('presupuesto'),
+    tests:{},updated_at:now()
+  };
+  const {data,error}=await supabaseClient.from('csi_reparaciones').insert(r).select().single();
+  if(error){showMsg('formMsg',error.message);return}
+  const fotos=await uploadPhotos(data.id,'recepcion','recepcionFotos').catch(e=>{console.error(e);return[]});
+  data.fotos={recepcion:fotos,antes:[],diagnostico:[],durante:[],despues:[]};
+  repairs.unshift(data);
+  document.querySelectorAll('#repSection input:not(#search),#repSection textarea').forEach(e=>e.value='');
+  document.getElementById('recepcionPreview').innerHTML='';
+  document.getElementById('prioridad').value='Normal';
+  showMsg('formMsg','Expediente '+data.folio+' creado correctamente.',true);
+  renderAll();openDetail(data.id);
+}
+
+function renderAll(){renderRepairs();renderCases();updateStats()}
+function renderRepairs(){
+  const q=(document.getElementById('search')?.value||'').toLowerCase();
+  const rows=repairs.filter(x=>[x.folio,x.cliente,x.telefono,x.marca,x.modelo,x.imei,x.falla,x.tecnico].some(z=>String(z||'').toLowerCase().includes(q)));
+  if(!rows.length){document.getElementById('repTable').innerHTML='<p class="muted">No hay reparaciones registradas.</p>';return}
+  document.getElementById('repTable').innerHTML=`<table><thead><tr><th>Folio</th><th>Fecha</th><th>Cliente</th><th>Equipo</th><th>Falla</th><th>Técnico</th><th>Estado</th><th>Presupuesto</th><th>Acción</th></tr></thead><tbody>${rows.map(x=>`<tr><td><b>${esc(x.folio)}</b></td><td>${new Date(x.created_at).toLocaleString('es-MX')}</td><td>${esc(x.cliente)}<br>${esc(x.telefono)}</td><td>${esc(x.marca)} ${esc(x.modelo)}<br>${esc(x.imei)}</td><td>${esc(x.falla)}</td><td>${esc(x.tecnico)}</td><td><span class="badge ${statusClass(x.estado)}">${esc(x.estado)}</span></td><td>${money(x.presupuesto)}</td><td>
+  <button class="primary" onclick="openDetail(${x.id})">Abrir expediente</button>
+  <button class="danger" onclick="deleteCSIRepair(${x.id})">🗑️ Eliminar</button>
+</td></tr>`).join('')}</tbody></table>`;
+}
+function renderCases(){
+  const rows=repairs.filter(x=>x.diagnostico||x.trabajo||x.mediciones);
+  if(!rows.length){document.getElementById('casesTable').innerHTML='<p class="muted">Todavía no hay casos técnicos documentados.</p>';return}
+  document.getElementById('casesTable').innerHTML=`<table><thead><tr><th>Folio</th><th>Equipo</th><th>Falla</th><th>Diagnóstico</th><th>Solución</th><th>Técnico</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.folio)}</td><td>${esc(x.marca)} ${esc(x.modelo)}</td><td>${esc(x.falla)}</td><td>${esc(x.diagnostico)}</td><td>${esc(x.trabajo)}</td><td>${esc(x.tecnico)}</td></tr>`).join('')}</tbody></table>`;
+}
+function updateStats(){
+  const open=repairs.filter(x=>!['Entregado','No reparado'].includes(x.estado)).length;
+  document.getElementById('statOpen').textContent=open;
+  document.getElementById('statDiag').textContent=repairs.filter(x=>x.estado==='En diagnóstico').length;
+  document.getElementById('statRepair').textContent=repairs.filter(x=>x.estado==='En reparación').length;
+  document.getElementById('statDone').textContent=repairs.filter(x=>['Reparado','Pendiente de pago','Entregado'].includes(x.estado)).length;
+}
+function showTab(t){
+  if(t==='usuarios') renderCSIUsers();
+  document.getElementById('repSection').classList.toggle('hidden',t!=='rep');
+  document.getElementById('casesSection').classList.toggle('hidden',t!=='cases');
+  document.getElementById('tabRep').classList.toggle('active',t==='rep');
+  document.getElementById('tabCases').classList.toggle('active',t==='cases');
+}
+
+let currentDetailStep=1;
+function showDetailStep(step){
+  step=Math.max(1,Math.min(6,Number(step)||1));currentDetailStep=step;
+  for(let i=1;i<=6;i++){document.getElementById('detailStep'+i)?.classList.toggle('active',i===step);const b=document.getElementById('stepBtn'+i);if(b){b.classList.toggle('active',i===step);b.classList.toggle('done',i<step)}}
+}
+async function openDetail(id){
+  const x=repairs.find(a=>a.id===id);if(!x)return;
+  x.fotos=await loadPhotos(id);
+  document.getElementById('detailId').value=id;document.getElementById('dFolio').textContent=x.folio;
+  [['dCliente','cliente'],['dTelefono','telefono'],['dTecnico','tecnico'],['dMarca','marca'],['dModelo','modelo'],['dImei','imei'],['dColor','color'],['dPin','pin'],['dFalla','falla'],['dDiagnostico','diagnostico'],['dMediciones','mediciones'],['dPruebas','pruebas'],['dTrabajo','trabajo'],['dComponentes','componentes'],['dObservaciones','observaciones']].forEach(([a,b])=>document.getElementById(a).value=x[b]||'');
+  document.getElementById('dEstado').value=x.estado||'Recibido';document.getElementById('dPresupuesto').value=x.presupuesto||0;document.getElementById('dAnticipo').value=x.anticipo||0;document.getElementById('dSaldo').value=Math.max(0,Number(x.presupuesto||0)-Number(x.anticipo||0));
+  const tests=x.tests||{};['Encendido','Carga','Pantalla','Touch','Camara','Micro','Bocina','Wifi','Bluetooth','Red','Sim','Biometria','Sensores','Bateria'].forEach(k=>{const el=document.getElementById('t'+k);if(el)el.checked=!!tests[k]});
+  renderSavedPhotos('pAntes',x.fotos.antes,true);renderSavedPhotos('pDiagnostico',x.fotos.diagnostico,true);renderSavedPhotos('pDurante',x.fotos.durante,true);renderSavedPhotos('pDespues',x.fotos.despues,true);
+  document.getElementById('detailModal').classList.remove('hidden');showDetailStep(1);
+}
+async function saveDetail(){
+  const id=Number(document.getElementById('detailId').value),x=repairs.find(a=>a.id===id);if(!x)return;
+  [['cliente','dCliente'],['telefono','dTelefono'],['marca','dMarca'],['modelo','dModelo'],['imei','dImei'],['color','dColor'],['pin','dPin'],['falla','dFalla'],['diagnostico','dDiagnostico'],['mediciones','dMediciones'],['pruebas','dPruebas'],['trabajo','dTrabajo'],['componentes','dComponentes'],['observaciones','dObservaciones']].forEach(([a,b])=>x[a]=document.getElementById(b).value.trim());
+  x.estado=document.getElementById('dEstado').value;x.presupuesto=n('dPresupuesto');x.anticipo=n('dAnticipo');x.saldo=Math.max(0,x.presupuesto-x.anticipo);
+  x.tests={};['Encendido','Carga','Pantalla','Touch','Camara','Micro','Bocina','Wifi','Bluetooth','Red','Sim','Biometria','Sensores','Bateria'].forEach(k=>x.tests[k]=document.getElementById('t'+k).checked);
+  const {error}=await supabaseClient.from('csi_reparaciones').update({
+    cliente:x.cliente,telefono:x.telefono,marca:x.marca,modelo:x.modelo,imei:x.imei,color:x.color,pin:x.pin,
+    falla:x.falla,diagnostico:x.diagnostico,mediciones:x.mediciones,pruebas:x.pruebas,trabajo:x.trabajo,
+    componentes:x.componentes,observaciones:x.observaciones,estado:x.estado,presupuesto:x.presupuesto,
+    anticipo:x.anticipo,saldo:x.saldo,tests:x.tests,updated_at:now()
+  }).eq('id',id);
+  if(error){showMsg('detailMsg',error.message);return}
+  const stages=[['antes','fAntes'],['diagnostico','fDiagnostico'],['durante','fDurante'],['despues','fDespues']];
+  for(const [stage,input] of stages){
+    const files=await uploadPhotos(id,stage,input);
+    x.fotos[stage]=[...(x.fotos[stage]||[]),...files];
+  }
+  renderSavedPhotos('pAntes',x.fotos.antes,true);renderSavedPhotos('pDiagnostico',x.fotos.diagnostico,true);renderSavedPhotos('pDurante',x.fotos.durante,true);renderSavedPhotos('pDespues',x.fotos.despues,true);
+  renderAll();showMsg('detailMsg','Expediente y fotos guardados en la nube.',true);
+}
+
+async function deleteCSIRepair(id){
+  const x=repairs.find(a=>Number(a.id)===Number(id));
+  if(!x)return;
+  const canDelete=currentProfile?.rol==='admin' || (currentProfile?.rol==='tecnico' && x.tecnico_id===currentUser?.id);
+  if(!canDelete){
+    alert('No tienes permiso para eliminar este expediente.');
+    return;
+  }
+  const ok=confirm(`¿Eliminar definitivamente el expediente ${x.folio}?\n\nSe eliminarán también las fotos asociadas.\nEsta acción no se puede deshacer.`);
+  if(!ok)return;
+
+  try{
+    // Get photo paths first so the Storage files can also be removed.
+    const {data:photos,error:photoReadError}=await supabaseClient
+      .from('csi_fotos')
+      .select('id,ruta')
+      .eq('reparacion_id',id);
+    if(photoReadError) throw photoReadError;
+
+    const paths=(photos||[]).map(p=>p.ruta).filter(Boolean);
+    if(paths.length){
+      const {error:storageError}=await supabaseClient.storage.from('csi-fotos').remove(paths);
+      if(storageError) throw storageError;
+    }
+
+    const {error}=await supabaseClient.from('csi_reparaciones').delete().eq('id',id);
+    if(error) throw error;
+
+    repairs=repairs.filter(a=>Number(a.id)!==Number(id));
+    closeDetail();
+    renderAll();
+    alert(`Expediente ${x.folio} eliminado correctamente.`);
+  }catch(e){
+    console.error(e);
+    alert('No se pudo eliminar el expediente: '+(e.message||e));
+  }
+}
+
+function printReport(){
+  const id=Number(document.getElementById('detailId').value),x=repairs.find(a=>a.id===id);if(!x)return;
+  const tests=Object.entries(x.tests||{}).map(([k,v])=>(v?'✓ ':'☐ ')+k).join(' | ');
+  const fotos=x.fotos||{};const fotoCount=['recepcion','antes','diagnostico','durante','despues'].reduce((n,k)=>n+(fotos[k]||[]).length,0);
+  const w=window.open('','_blank','width=800,height=900');if(!w){alert('Permite ventanas emergentes para imprimir.');return}
+  w.document.write(`<html><head><title>${x.folio}</title><style>body{font-family:Arial;padding:30px;max-width:760px;margin:auto}h1,h2{margin-bottom:5px}.box{border:1px solid #ddd;padding:12px;margin:10px 0}.row{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding:6px}.small{color:#666;font-size:12px}</style></head><body><h1>🔧 CSI — Centro de Servicio Integral</h1><div class="small">Expediente técnico ${esc(x.folio)}</div><div class="box"><div class="row"><b>Cliente</b><span>${esc(x.cliente)}</span></div><div class="row"><b>Equipo</b><span>${esc(x.marca)} ${esc(x.modelo)}</span></div><div class="row"><b>IMEI/Serie</b><span>${esc(x.imei)}</span></div><div class="row"><b>Técnico</b><span>${esc(x.tecnico)}</span></div><div class="row"><b>Estado</b><span>${esc(x.estado)}</span></div></div><h2>Falla reportada</h2><div class="box">${esc(x.falla)}</div><h2>Diagnóstico</h2><div class="box">${esc(x.diagnostico)}</div><h2>Mediciones</h2><div class="box">${esc(x.mediciones)}</div><h2>Trabajo realizado</h2><div class="box">${esc(x.trabajo)}</div><h2>Componentes / refacciones</h2><div class="box">${esc(x.componentes)}</div><h2>Pruebas finales</h2><div class="box">${esc(tests)}</div><h2>Evidencia fotográfica</h2><div class="box">Fotos documentadas: ${fotoCount}</div><h2>Finanzas</h2><div class="box">Presupuesto: ${money(x.presupuesto)}<br>Anticipo: ${money(x.anticipo)}<br>Saldo: ${money(x.saldo)}</div><p class="small">Generado por CSI — Centro de Servicio Integral</p><script>window.onload=()=>window.print()<\\/script></body></html>`);w.document.close();
+}
+
+/* ===== AUTH ===== */
+async function loginCSI(){
+  const raw=document.getElementById('loginUser').value.trim(), password=document.getElementById('loginPass').value;
+  const err=document.getElementById('loginError');err.style.display='none';
+  if(!raw||!password){err.textContent='Escribe usuario y contraseña.';err.style.display='block';return}
+  let email=raw;
+  if(!raw.includes('@')){
+    const {data,error}=await supabaseClient.rpc('csi_email_por_usuario',{p_usuario:raw});
+    if(error||!data){err.textContent='Usuario no encontrado.';err.style.display='block';return}
+    email=data;
+  }
+  const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+  if(error){err.textContent=error.message;err.style.display='block';return}
+  await startCSI(data.user);
+}
+async function signupCSI(){
+  const name=v('signupName'),username=v('signupUsername').toLowerCase(),email=v('signupEmail').toLowerCase(),password=document.getElementById('signupPassword').value;
+  const err=document.getElementById('signupError');err.style.display='none';
+  if(!name||!username||!email||password.length<6){err.textContent='Completa los datos. La contraseña debe tener mínimo 6 caracteres.';err.style.display='block';return}
+  const {data:exists}=await supabaseClient.from('csi_tecnicos').select('id').eq('usuario',username).maybeSingle();
+  if(exists){err.textContent='Ese usuario ya existe.';err.style.display='block';return}
+  const {data,error}=await supabaseClient.auth.signUp({email,password,options:{data:{nombre:name,usuario:username}}});
+  if(error){err.textContent=error.message;err.style.display='block';return}
+  if(data.user){
+    alert('Cuenta creada. Si Supabase pide confirmar el correo, confírmalo y después inicia sesión.');
+    toggleSignup();
+  }
+}
+function toggleSignup(){
+  document.getElementById('loginForm').classList.toggle('hidden');
+  document.getElementById('signupForm').classList.toggle('hidden');
+}
+async function startCSI(user){
+  currentUser=user;
+  try{currentProfile=await getProfile(user)}catch(e){alert('No se encontró el perfil del técnico. Ejecuta el SQL de CSI primero.');return}
+  document.getElementById('loginScreen').style.display='none';
+  const header=document.querySelector('header');
+  let box=document.getElementById('csiSessionBox');
+  if(!box){box=document.createElement('div');box.id='csiSessionBox';box.style.cssText='display:flex;align-items:center;gap:10px;justify-content:flex-end;margin:8px 0 14px;flex-wrap:wrap';header.appendChild(box)}
+  box.innerHTML=`<span class="user-badge">👤 ${esc(currentProfile.nombre)} · ${esc(currentProfile.rol)}</span><button onclick="logoutCSI()" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;cursor:pointer">Cerrar sesión</button>`;
+  const tabUsers=document.getElementById('tabUsuarios');if(tabUsers)tabUsers.classList.toggle('hidden',currentProfile.rol!=='admin');
+  const us=document.getElementById('usuarios');if(us&&currentProfile.rol!=='admin')us.classList.add('hidden');
+  if(document.getElementById('dTecnico'))document.getElementById('dTecnico').value=currentProfile.nombre;
+  await loadRepairs();
+}
+async function logoutCSI(){await supabaseClient.auth.signOut();location.reload()}
+
+document.addEventListener('DOMContentLoaded',async()=>{
+  const {data}=await supabaseClient.auth.getSession();
+  if(data.session){await startCSI(data.session.user)}
+  supabaseClient.auth.onAuthStateChange((_event,session)=>{if(session&&!currentUser)startCSI(session.user)});
+});
+
+
+/* ===== ADMINISTRACIÓN DE PERFILES ===== */
+async function renderCSIUsers(){
+  const box=document.getElementById('usersList');if(!box||currentProfile?.rol!=='admin')return;
+  const {data,error}=await supabaseClient.from('csi_tecnicos').select('*').order('nombre');
+  if(error){box.innerHTML='<p class="muted">No se pudieron cargar los usuarios.</p>';return}
+  box.innerHTML='<div class="users-grid">'+(data||[]).map(u=>`<div class="user-card"><strong>👤 ${esc(u.nombre)}</strong><div style="color:#667085;margin-top:5px">@${esc(u.usuario)}</div><div style="margin-top:8px"><span class="user-badge">${esc(u.rol)}</span></div></div>`).join('')+'</div>';
+}
+
+
+async function deleteCSIRepair(id){
+  const session = getCSISession();
+  if(!session) return alert('Debes iniciar sesión.');
+  if(!confirm('¿Seguro que quieres eliminar este expediente? Esta acción no se puede deshacer.')) return;
+
+  try{
+    // Get photo paths first, then remove database records and storage objects.
+    const {data:photos,error:photoErr}=await supabaseClient
+      .from('csi_fotos')
+      .select('id,ruta')
+      .eq('reparacion_id',id);
+
+    if(photoErr) throw photoErr;
+
+    const paths=(photos||[]).map(p=>p.ruta).filter(Boolean);
+    if(paths.length){
+      const {error:storageErr}=await supabaseClient.storage.from('csi-fotos').remove(paths);
+      if(storageErr) throw storageErr;
+    }
+
+    const {error:dbPhotoErr}=await supabaseClient
+      .from('csi_fotos')
+      .delete()
+      .eq('reparacion_id',id);
+    if(dbPhotoErr) throw dbPhotoErr;
+
+    const {error:repairErr}=await supabaseClient
+      .from('csi_reparaciones')
+      .delete()
+      .eq('id',id);
+    if(repairErr) throw repairErr;
+
+    alert('Expediente y fotografías eliminados correctamente.');
+    if(typeof loadRepairs==='function') await loadRepairs();
+    if(typeof renderAll==='function') await renderAll();
+  }catch(e){
+    console.error(e);
+    alert('No se pudo eliminar el expediente: '+(e.message||e));
+  }
+}
+
+</script>
+</body>
+</html>
