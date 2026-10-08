@@ -110,12 +110,6 @@ button,input,select,textarea{font:inherit;max-width:100%}
   .table-wrap{overflow-x:auto}
 }
 
-
-@media(max-width:700px){
-  #repTable td:last-child{min-width:170px}
-  #repTable td:last-child button{display:block;width:100%;margin:4px 0}
-}
-
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -506,10 +500,7 @@ function renderRepairs(){
   const q=(document.getElementById('search')?.value||'').toLowerCase();
   const rows=repairs.filter(x=>[x.folio,x.cliente,x.telefono,x.marca,x.modelo,x.imei,x.falla,x.tecnico].some(z=>String(z||'').toLowerCase().includes(q)));
   if(!rows.length){document.getElementById('repTable').innerHTML='<p class="muted">No hay reparaciones registradas.</p>';return}
-  document.getElementById('repTable').innerHTML=`<table><thead><tr><th>Folio</th><th>Fecha</th><th>Cliente</th><th>Equipo</th><th>Falla</th><th>Técnico</th><th>Estado</th><th>Presupuesto</th><th>Acción</th></tr></thead><tbody>${rows.map(x=>`<tr><td><b>${esc(x.folio)}</b></td><td>${new Date(x.created_at).toLocaleString('es-MX')}</td><td>${esc(x.cliente)}<br>${esc(x.telefono)}</td><td>${esc(x.marca)} ${esc(x.modelo)}<br>${esc(x.imei)}</td><td>${esc(x.falla)}</td><td>${esc(x.tecnico)}</td><td><span class="badge ${statusClass(x.estado)}">${esc(x.estado)}</span></td><td>${money(x.presupuesto)}</td><td>
-  <button class="primary" onclick="openDetail(${x.id})">Abrir expediente</button>
-  <button class="danger" onclick="deleteCSIRepair(${x.id})">🗑️ Eliminar</button>
-</td></tr>`).join('')}</tbody></table>`;
+  document.getElementById('repTable').innerHTML=`<table><thead><tr><th>Folio</th><th>Fecha</th><th>Cliente</th><th>Equipo</th><th>Falla</th><th>Técnico</th><th>Estado</th><th>Presupuesto</th><th>Acción</th></tr></thead><tbody>${rows.map(x=>`<tr><td><b>${esc(x.folio)}</b></td><td>${new Date(x.created_at).toLocaleString('es-MX')}</td><td>${esc(x.cliente)}<br>${esc(x.telefono)}</td><td>${esc(x.marca)} ${esc(x.modelo)}<br>${esc(x.imei)}</td><td>${esc(x.falla)}</td><td>${esc(x.tecnico)}</td><td><span class="badge ${statusClass(x.estado)}">${esc(x.estado)}</span></td><td>${money(x.presupuesto)}</td><td><button class="primary" onclick="openDetail(${x.id})">Abrir expediente</button> <button class="danger" onclick="deleteCSIRepair(${x.id})">🗑️ Eliminar</button></td></tr>`).join('')}</tbody></table>`;
 }
 function renderCases(){
   const rows=repairs.filter(x=>x.diagnostico||x.trabajo||x.mediciones);
@@ -566,59 +557,104 @@ async function saveDetail(){
   renderSavedPhotos('pAntes',x.fotos.antes,true);renderSavedPhotos('pDiagnostico',x.fotos.diagnostico,true);renderSavedPhotos('pDurante',x.fotos.durante,true);renderSavedPhotos('pDespues',x.fotos.despues,true);
   renderAll();showMsg('detailMsg','Expediente y fotos guardados en la nube.',true);
 }
-
 async function deleteCSIRepair(id){
   if(!currentUser || !currentProfile){
     alert('La sesión no está activa. Vuelve a iniciar sesión.');
     return;
   }
-
-  const repair=repairs.find(x=>Number(x.id)===Number(id));
-  if(!repair){
-    alert('No se encontró el expediente.');
-    return;
-  }
-
-  const allowed = currentProfile.rol==='admin' || String(repair.tecnico_id)===String(currentUser.id);
-  if(!allowed){
-    alert('No tienes permiso para eliminar este expediente.');
-    return;
-  }
-
+  const x=repairs.find(a=>Number(a.id)===Number(id));
+  if(!x){alert('No se encontró el expediente.');return;}
+  const allowed=currentProfile.rol==='admin' || String(x.tecnico_id)===String(currentUser.id);
+  if(!allowed){alert('No tienes permiso para eliminar este expediente.');return;}
   if(!confirm('¿Seguro que quieres eliminar este expediente? También se eliminarán sus fotografías. Esta acción no se puede deshacer.')) return;
-
   try{
-    const {data:photos,error:photoErr}=await supabaseClient
-      .from('csi_fotos')
-      .select('id,ruta')
-      .eq('reparacion_id',id);
+    const {data:photos,error:photoErr}=await supabaseClient.from('csi_fotos').select('ruta').eq('reparacion_id',id);
     if(photoErr) throw photoErr;
-
     const paths=(photos||[]).map(p=>p.ruta).filter(Boolean);
     if(paths.length){
-      const {error:storageErr}=await supabaseClient.storage.from('csi-fotos').remove(paths);
-      if(storageErr) console.warn('No se pudieron borrar algunas fotos del Storage:',storageErr);
+      const {error:e}=await supabaseClient.storage.from('csi-fotos').remove(paths);
+      if(e) console.warn('Storage:',e.message);
     }
-
-    const {error:dbPhotoErr}=await supabaseClient
-      .from('csi_fotos')
-      .delete()
-      .eq('reparacion_id',id);
-    if(dbPhotoErr) throw dbPhotoErr;
-
-    const {error:repairErr}=await supabaseClient
-      .from('csi_reparaciones')
-      .delete()
-      .eq('id',id);
-    if(repairErr) throw repairErr;
-
+    const {error:e1}=await supabaseClient.from('csi_fotos').delete().eq('reparacion_id',id);
+    if(e1) throw e1;
+    const {error:e2}=await supabaseClient.from('csi_reparaciones').delete().eq('id',id);
+    if(e2) throw e2;
     closeDetail();
     await loadRepairs();
     alert('Expediente eliminado correctamente.');
   }catch(e){
     console.error(e);
-    alert('No se pudo eliminar el expediente: '+(e.message||e));
+    alert('No se pudo eliminar: '+(e.message||e));
   }
+}
+function printReport(){
+  const id=Number(document.getElementById('detailId').value),x=repairs.find(a=>a.id===id);if(!x)return;
+  const tests=Object.entries(x.tests||{}).map(([k,v])=>(v?'✓ ':'☐ ')+k).join(' | ');
+  const fotos=x.fotos||{};const fotoCount=['recepcion','antes','diagnostico','durante','despues'].reduce((n,k)=>n+(fotos[k]||[]).length,0);
+  const w=window.open('','_blank','width=800,height=900');if(!w){alert('Permite ventanas emergentes para imprimir.');return}
+  w.document.write(`<html><head><title>${x.folio}</title><style>body{font-family:Arial;padding:30px;max-width:760px;margin:auto}h1,h2{margin-bottom:5px}.box{border:1px solid #ddd;padding:12px;margin:10px 0}.row{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding:6px}.small{color:#666;font-size:12px}</style></head><body><h1>🔧 CSI — Centro de Servicio Integral</h1><div class="small">Expediente técnico ${esc(x.folio)}</div><div class="box"><div class="row"><b>Cliente</b><span>${esc(x.cliente)}</span></div><div class="row"><b>Equipo</b><span>${esc(x.marca)} ${esc(x.modelo)}</span></div><div class="row"><b>IMEI/Serie</b><span>${esc(x.imei)}</span></div><div class="row"><b>Técnico</b><span>${esc(x.tecnico)}</span></div><div class="row"><b>Estado</b><span>${esc(x.estado)}</span></div></div><h2>Falla reportada</h2><div class="box">${esc(x.falla)}</div><h2>Diagnóstico</h2><div class="box">${esc(x.diagnostico)}</div><h2>Mediciones</h2><div class="box">${esc(x.mediciones)}</div><h2>Trabajo realizado</h2><div class="box">${esc(x.trabajo)}</div><h2>Componentes / refacciones</h2><div class="box">${esc(x.componentes)}</div><h2>Pruebas finales</h2><div class="box">${esc(tests)}</div><h2>Evidencia fotográfica</h2><div class="box">Fotos documentadas: ${fotoCount}</div><h2>Finanzas</h2><div class="box">Presupuesto: ${money(x.presupuesto)}<br>Anticipo: ${money(x.anticipo)}<br>Saldo: ${money(x.saldo)}</div><p class="small">Generado por CSI — Centro de Servicio Integral</p><script>window.onload=()=>window.print()<\\/script></body></html>`);w.document.close();
+}
+
+/* ===== AUTH ===== */
+async function loginCSI(){
+  const raw=document.getElementById('loginUser').value.trim(), password=document.getElementById('loginPass').value;
+  const err=document.getElementById('loginError');err.style.display='none';
+  if(!raw||!password){err.textContent='Escribe usuario y contraseña.';err.style.display='block';return}
+  let email=raw;
+  if(!raw.includes('@')){
+    const {data,error}=await supabaseClient.rpc('csi_email_por_usuario',{p_usuario:raw});
+    if(error||!data){err.textContent='Usuario no encontrado.';err.style.display='block';return}
+    email=data;
+  }
+  const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+  if(error){err.textContent=error.message;err.style.display='block';return}
+  await startCSI(data.user);
+}
+async function signupCSI(){
+  const name=v('signupName'),username=v('signupUsername').toLowerCase(),email=v('signupEmail').toLowerCase(),password=document.getElementById('signupPassword').value;
+  const err=document.getElementById('signupError');err.style.display='none';
+  if(!name||!username||!email||password.length<6){err.textContent='Completa los datos. La contraseña debe tener mínimo 6 caracteres.';err.style.display='block';return}
+  const {data:exists}=await supabaseClient.from('csi_tecnicos').select('id').eq('usuario',username).maybeSingle();
+  if(exists){err.textContent='Ese usuario ya existe.';err.style.display='block';return}
+  const {data,error}=await supabaseClient.auth.signUp({email,password,options:{data:{nombre:name,usuario:username}}});
+  if(error){err.textContent=error.message;err.style.display='block';return}
+  if(data.user){
+    alert('Cuenta creada. Si Supabase pide confirmar el correo, confírmalo y después inicia sesión.');
+    toggleSignup();
+  }
+}
+function toggleSignup(){
+  document.getElementById('loginForm').classList.toggle('hidden');
+  document.getElementById('signupForm').classList.toggle('hidden');
+}
+async function startCSI(user){
+  currentUser=user;
+  try{currentProfile=await getProfile(user)}catch(e){alert('No se encontró el perfil del técnico. Ejecuta el SQL de CSI primero.');return}
+  document.getElementById('loginScreen').style.display='none';
+  const header=document.querySelector('header');
+  let box=document.getElementById('csiSessionBox');
+  if(!box){box=document.createElement('div');box.id='csiSessionBox';box.style.cssText='display:flex;align-items:center;gap:10px;justify-content:flex-end;margin:8px 0 14px;flex-wrap:wrap';header.appendChild(box)}
+  box.innerHTML=`<span class="user-badge">👤 ${esc(currentProfile.nombre)} · ${esc(currentProfile.rol)}</span><button onclick="logoutCSI()" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;cursor:pointer">Cerrar sesión</button>`;
+  const tabUsers=document.getElementById('tabUsuarios');if(tabUsers)tabUsers.classList.toggle('hidden',currentProfile.rol!=='admin');
+  const us=document.getElementById('usuarios');if(us&&currentProfile.rol!=='admin')us.classList.add('hidden');
+  if(document.getElementById('dTecnico'))document.getElementById('dTecnico').value=currentProfile.nombre;
+  await loadRepairs();
+}
+async function logoutCSI(){await supabaseClient.auth.signOut();location.reload()}
+
+document.addEventListener('DOMContentLoaded',async()=>{
+  const {data}=await supabaseClient.auth.getSession();
+  if(data.session){await startCSI(data.session.user)}
+  supabaseClient.auth.onAuthStateChange((_event,session)=>{if(session&&!currentUser)startCSI(session.user)});
+});
+
+
+/* ===== ADMINISTRACIÓN DE PERFILES ===== */
+async function renderCSIUsers(){
+  const box=document.getElementById('usersList');if(!box||currentProfile?.rol!=='admin')return;
+  const {data,error}=await supabaseClient.from('csi_tecnicos').select('*').order('nombre');
+  if(error){box.innerHTML='<p class="muted">No se pudieron cargar los usuarios.</p>';return}
+  box.innerHTML='<div class="users-grid">'+(data||[]).map(u=>`<div class="user-card"><strong>👤 ${esc(u.nombre)}</strong><div style="color:#667085;margin-top:5px">@${esc(u.usuario)}</div><div style="margin-top:8px"><span class="user-badge">${esc(u.rol)}</span></div></div>`).join('')+'</div>';
 }
 
 </script>
